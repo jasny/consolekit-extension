@@ -24,6 +24,7 @@ class HelpCommand extends Command
     public function execute(array $args, array $options = array())
     {
         if (empty($args)) {
+            $this->showUsage();
             $this->showCommands();
         } else {
             $this->showHelp($args[0], Utils::get($args, 1));
@@ -31,15 +32,21 @@ class HelpCommand extends Command
     }
 
     /**
-     * Show available options and commands
+     * Show usage
      */
-    protected function showCommands()
+    protected function showUsage()
     {
         $scriptName = basename($_SERVER['SCRIPT_FILENAME']);
         
         $this->writeln('Usage:', Colors::YELLOW);
         $this->writeln("  $scriptName command [arguments]\n");
-
+    }
+    
+    /**
+     * Show available options and commands
+     */
+    protected function showCommands()
+    {
         $formater = new TextFormater(array('indent' => 2));
         $this->writeln('Available commands:', Colors::YELLOW);
 
