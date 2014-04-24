@@ -2,8 +2,7 @@
 
 namespace Jasny\ConsoleKit\Widgets;
 
-use ConsoleKit\TextWriter,
-    ConsoleKit\ConsoleException;
+use ConsoleKit\Widgets\AbstractWidget, ConsoleKit\TextWriter, ConsoleKit\ConsoleException;
 
 class Table extends AbstractWidget
 {
@@ -11,16 +10,16 @@ class Table extends AbstractWidget
     protected $values;
 
     /** @var boolean */
-    protected $headers;
+    protected $headers = false;
 
     /** @var boolean */
-    protected $border;
+    protected $border = true;
 
     /** @var boolean */
-    protected $frame;
+    protected $frame = true;
 
     /** @var boolean */
-    protected $skipEmpty;
+    protected $skipEmpty = false;
 
     
     /**
@@ -150,19 +149,22 @@ class Table extends AbstractWidget
      */
     protected function renderBorder(array $widths)
     {
-        $output = "";
+        if (!$this->frame && !$this->border) return "\n";
         
-        if ($this->border) {
-            if ($this->frame) $output .= "+";
+        $output = "+";
+        
+        foreach ($widths as $i=>$width) {
+            if ($this->skipEmpty && $width === 0) continue;
             
-            foreach ($widths as $i=>$width) {
-                if ($this->border || $i > 0) $width++;
-                if ($this->border || $i < count($widths) -1) $width++;
-                
-                $output .= str_repeat('-', $width);
-                if ($this->frame) $output .= "+";
+            if ($this->frame) {
+                $output .= str_repeat('-', $width + 2) . "+";
+            } elseif ($this->border) {
+                if ($output === '+') $width += 1;
+                $output .= str_repeat('-', $width + 8 - ($width % 8));
             }
         }
+        
+        if (!$this->frame) $output = substr_replace($output, "+", -1);
 
         return $output . "\n";
     }
@@ -174,18 +176,18 @@ class Table extends AbstractWidget
      */
     protected function getRowFormat(array $widths)
     {
-        $padding = $this->frame ? " " : "";
-        $spacing = $this->frame ? "" : "\t";
         $format = ""; 
         
         foreach ($widths as $i=>$width) {
             if ($this->skipEmpty && $width === 0) continue;
             
-            if ($format) $format .= $spacing;
-            $format .= "{$padding}%$i\$-{$width}s{$padding}";
+            if (!$this->frame && $format) $format .= "\t";
+            if ($this->frame) $format .= " ";
+            $format .= "%" . ($i+1) . "\$-" . $width . "s";
+            if ($this->frame) $format .= " |";
         }
 
-        if ($this->border) $format = "|" . ($this->frame ? "" : " ") . $format . ($this->frame ? "" : " ") . "|";
+        if ($this->border) $format = "|" . ($this->frame ? "" : " ") . $format . ($this->frame ? "" : "\t|");
         
         return $format . "\n";
     }
