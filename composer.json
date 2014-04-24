@@ -1,0 +1,27 @@
+{
+    "name": "jasny/consolekit-extension",
+    "description": "An extension to maximebf/consolekit",
+    "keywords": ["cli", "console", "shell", "commands"],
+    "license": "MIT",
+    "homepage": "http://jasny.github.com/consolekit-extension",
+    "authors": [
+        {
+            "name": "Arnold Daniels",
+            "email": "arnold@jasny.net",
+            "homepage": "http://www.jasny.net"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/jasny/consolekit-extension/issues",
+        "source": "https://github.com/jasny/consolekit-extension"
+    },
+    "require": {
+        "php": ">=5.3.2",
+        "maximebf/consolekit": "~1.0.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Jasny\\ConsoleKit": "src/"
+        }
+    }
+}
