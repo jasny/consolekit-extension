@@ -10,8 +10,8 @@ use ConsoleKit\Command, ConsoleKit\TextFormater, ConsoleKit\Utils, ConsoleKit\Co
  * @usage $0 help [command_name]
  * @arg command_name The command name
  * 
- * @example `$0 help`         Show a list of all commands
- * @example `$0 help status`  Displays help for the status command
+ * @example `$0 help`       Show a list of all commands
+ * @example `$0 help help`  Displays help for the help command
  */
 class HelpCommand extends Command
 {
