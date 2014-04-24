@@ -3,7 +3,7 @@
 namespace Jasny\ConsoleKit;
 
 use ReflectionClass, ReflectionFunction;
-use ConsoleKit\Utils, ConsoleKit\TextFormater, ConsoleKit\Colors;
+use ConsoleKit\Utils, ConsoleKit\TextFormater, ConsoleKit\Colors, ConsoleKit\ConsoleException;
 
 /**
  * Generates help messages based on information in doc comments.
@@ -14,9 +14,29 @@ use ConsoleKit\Utils, ConsoleKit\TextFormater, ConsoleKit\Colors;
  */
 class Help extends \ConsoleKit\Help
 {
+    /** @var string */
+    protected $more;
+    
     /** @var array */
     protected $examples;
 
+    /**
+     * Creates an Help object from a FQDN
+     *
+     * @param string $fqdn
+     * @param string $subCommand
+     * @return Help
+     */
+    public static function fromFQDN($fqdn, $subCommand = null)
+    {
+        if (function_exists($fqdn)) {
+            return static::fromFunction($fqdn);
+        }
+        if (class_exists($fqdn) && is_subclass_of($fqdn, 'ConsoleKit\Command')) {
+            return static::fromCommandClass($fqdn, $subCommand);
+        }
+        throw new ConsoleException("'$fqdn' is not a valid ConsoleKit FQDN");
+    }
     
     /**
      * Creates an Help object from a function
@@ -69,6 +89,8 @@ class Help extends \ConsoleKit\Help
      */
     protected function parse()
     {
+        $scriptName = basename($_SERVER['SCRIPT_FILENAME']);
+        
         $this->usage = '';
         $this->args = array();
         $this->options = array();
@@ -80,7 +102,7 @@ class Help extends \ConsoleKit\Help
         $desc = array();
         foreach ($lines as $line) {
             if (preg_match('/@usage (.+)$/', $line, $matches)) {
-                $this->usage = str_replace('$0', self::getArgv0(), $matches[1]);
+                $this->usage = str_replace('$0', $scriptName, $matches[1]);
             } elseif (preg_match('/@arg ([^\s]+)(?:\s+(.*))?$/', $line, $matches)) {
                 $this->args[$matches[1]] = isset($matches[2]) ? $matches[2] : '';
             } elseif (preg_match('/@opt (?:(?:--)?([a-zA-Z\-_0-9=]+))?(?:\s+-(\w))?(?:\s+(.*))?$/', $line, $matches)) {
@@ -90,14 +112,15 @@ class Help extends \ConsoleKit\Help
                 $matches += array(null, null, '');
                 $this->options[] = array('opt'=>null, 'flag'=>$matches[1], 'desc'=>$matches[2]);
             } elseif (preg_match('/@example `([^`]+)`(?:\s+(.*))?$/', $line, $matches)) {
-                $code = str_replace('$0', self::getArgv0(), $matches[1]);
+                $code = str_replace('$0', $scriptName, $matches[1]);
                 $this->examples[] = array('code'=>$code, 'desc'=>isset($matches[2]) ? $matches[2] : '');
             } elseif (!preg_match('/^@([a-zA-Z\-_0-9]+)(.*)$/', $line)) {
                 $desc[] = $line;
             }
         }
         
-        $this->description = trim(implode("\n", $desc), "\n ");
+        $description = trim(implode("\n", $desc), "\n ");
+        list($this->description, $this->more) = explode("\n\n", $description, 2) + array(null, null);
     }
     
     /**
@@ -111,63 +134,114 @@ class Help extends \ConsoleKit\Help
     /**
      * @return string
      */
-    public function render()
+    public function getMore()
     {
-        $indent = new TextFormater(array('indent'=>1));
-            
-        $output = "{$this->description}\n\n";
-        if (!empty($this->usage)) {
-            $output .= Colors::colorize("Usage: \n", Colors::YELLOW) . "{$this->usage}\n\n";
-        }
-        if (!empty($this->args)) {
-            $output .= Colors::colorize("Arguments:\n", Colors::YELLOW);
-            $rows = [];
-            foreach ($this->args as $name => $desc) {
-                $rows[] = array($name, $desc);
-            }
-            $table = new Widgets\Table(null, $rows, array('border'=>false, 'frame'=>false));
-            $output .= $indent->format($table->render()) . "\n";
-        }
-        if (!empty($this->options)) {
-            $output .= Colors::colorize("Options:\n", Colors::YELLOW);
-            $rows = array();
-            foreach ($this->options as $option) {
-                $rows[] = array(
-                    $option['opt'] ? '--' . $option['opt'] : null,
-                    $option['flag'] ? '-' . $option['flag'] : null,
-                    $option['desc']
-                );
-            }
-            $table = new Widgets\Table(null, $rows, array('border'=>false, 'frame'=>false, 'skipEmpty'=>true));
-            $output .= $indent->format($table->render()) . "\n";
-        }
-        if (!empty($this->subCommands)) {
-            $output .= Colors::colorize("Sub commands:\n", Colors::YELLOW);
-            $rows = array();
-            foreach ($this->subCommands as $name=>$desc) {
-                $rows[] = array($name, $desc);
-            }
-            $table = new Widgets\Table(null, $rows, array('border'=>false, 'frame'=>false));
-            $output .= $indent->format($table->render()) . "\n";
-        }
-        if (!empty($this->examples)) {
-            $output .= Colors::colorize("Help:\n", Colors::YELLOW);
-            foreach ($this->example as $example) {
-                if ($example['desc']) $output .= " {$example['desc']}:\n\n";
-                if ($example['code']) $output .= Colors::colorize("  {$example['code']}\n\n", Colors::GREEN);
-            }
-        }
-        return trim($output, "\n ");
+        return $this->more;
     }
     
     
     /**
-     * Get executed command
+     * @return string
+     */
+    public function render()
+    {
+        $output = "$this->description\n\n"
+            . $this->renderUsage()
+            . $this->renderArgs()
+            . $this->renderOptions()
+            . $this->renderSubcommands()
+            . ($this->more ? "$this->more\n\n" : '')
+            . $this->renderExamples();
+        
+        return trim($output, "\n ");
+    }
+
+    /**
+     * Render usage
      * 
      * @return string
      */
-    public static function getArgv0()
+    protected function renderUsage()
     {
-        return $_SERVER['argv'][0];
+        if (empty($this->usage)) return null;
+        return Colors::colorize("Usage: \n", Colors::YELLOW) . "  {$this->usage}\n\n";
+    }
+
+    /**
+     * Render arguments
+     * 
+     * @return string
+     */
+    protected function renderArgs()
+    {
+        if (empty($this->args)) return null;
+        
+        $rows = [];
+        foreach ($this->args as $name => $desc) {
+            $rows[] = array(Colors::colorize($name, Colors::GREEN), $desc);
+        }
+        $table = new Widgets\Table(null, $rows, array('border'=>false, 'frame'=>false));
+
+        $formater = new TextFormater(array('indent' => 2));
+        return Colors::colorize("Arguments:\n", Colors::YELLOW) . $formater->format($table->render()) . "\n";
+    }
+    
+    /**
+     * Render options
+     * 
+     * @return string
+     */
+    protected function renderOptions()
+    {
+        if (empty($this->options)) return null;
+        
+        $rows = array();
+        foreach ($this->options as $option) {
+            $rows[] = array(
+                Colors::colorize($option['opt'] ? '--' . $option['opt'] : null, Colors::GREEN),
+                Colors::colorize($option['flag'] ? '-' . $option['flag'] : null, Colors::GREEN),
+                $option['desc']
+            );
+        }
+        $table = new Widgets\Table(null, $rows, array('border'=>false, 'frame'=>false, 'skipEmpty'=>true));
+        
+        $formater = new TextFormater(array('indent' => 2));
+        return Colors::colorize("Options:\n", Colors::YELLOW) . $formater->format($table->render()) . "\n";
+    }
+
+    /**
+     * Render subcommands
+     * 
+     * @return string
+     */
+    protected function renderSubcommands()
+    {
+        if (empty($this->subCommands)) return null;
+        
+        $rows = array();
+        foreach ($this->subCommands as $name => $desc) {
+            $rows[] = array(Colors::colorize($name, Colors::GREEN), $desc);
+        }
+        $table = new Widgets\Table(null, $rows, array('border'=>false, 'frame'=>false));
+        
+        $formater = new TextFormater(array('indent' => 2));
+        return Colors::colorize("Sub commands:\n", Colors::YELLOW) . $formater->format($table->render()) . "\n";
+    }
+
+    /**
+     * Render examples
+     * 
+     * @return string
+     */
+    protected function renderExamples()
+    {
+        if (empty($this->examples)) return null;
+        
+        $output = Colors::colorize("Examples:\n", Colors::YELLOW);
+        foreach ($this->examples as $example) {
+            $output .= "  {$example['desc']}:\n" . Colors::colorize("    {$example['code']}", Colors::GREEN) . "\n\n";
+        }
+        
+        return $output;
     }
 }
