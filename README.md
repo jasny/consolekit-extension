@@ -34,14 +34,15 @@ Options (booleans):
   * `border`     - Draw a border around the table (default: true)
   * `frame`      - Draw a frame between the columns of the table (default: true)
   * `skipEmpty`  - Skip empty columns (default: false)
+
+```php 
+$rows = array(
+    array('Name', 'Occupation', 'Country'),
+    array('John Doe', 'Plummer', 'Netherlands'),
+    array('Joe Fisher', 'Cook', 'France'),
+    array('Jack Black', 'Actor', 'USA')
+);
     
-    $rows = array(
-        array('Name', 'Occupation', 'Country'),
-        array('John Doe', 'Plummer', 'Netherlands'),
-        array('Joe Fisher', 'Cook', 'France'),
-        array('Jack Black', 'Actor', 'USA')
-    );
-    
-    $table = new Jasny\ConsoleKit\Widgets\Table($textwriter, $rows, array('headers'=>true));
-    $table->write();
-    
+$table = new Jasny\ConsoleKit\Widgets\Table($textwriter, $rows, array('headers'=>true));
+$table->write();
+```
